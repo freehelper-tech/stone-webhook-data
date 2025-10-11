@@ -9,7 +9,7 @@ from datetime import datetime
 # Adicionar diretório pai ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.data.empreendedor_repository import EmpreendedorRepository
+from data.empreendedor_repository import EmpreendedorRepository
 import logging
 
 logging.basicConfig(
@@ -207,7 +207,7 @@ def buscar_por_nome(repo):
     
     print(f"\n{Colors.CYAN}Buscando por nome contendo '{nome}'...{Colors.END}")
     
-    from app.dto.webhook_dtos import EmpreendedorSearchRequest
+    from dto.webhook_dtos import EmpreendedorSearchRequest
     filtros = EmpreendedorSearchRequest(
         nome=nome,
         page=1,
@@ -245,7 +245,7 @@ def listar_ultimos(repo):
     
     print(f"\n{Colors.CYAN}Buscando últimos {limite} empreendedores...{Colors.END}")
     
-    from app.dto.webhook_dtos import EmpreendedorSearchRequest
+    from dto.webhook_dtos import EmpreendedorSearchRequest
     filtros = EmpreendedorSearchRequest(
         page=1,
         page_size=limite

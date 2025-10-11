@@ -10,7 +10,7 @@ import time
 import json
 from datetime import datetime
 
-from app.dto.webhook_dtos import (
+from dto.webhook_dtos import (
     JotformWebhookPayload,
     EmpreendedorCreateRequest,
     EmpreendedorResponse,
@@ -20,9 +20,9 @@ from app.dto.webhook_dtos import (
     EmpreendedorUpdateRequest,
     EmpreendedorStatsResponse
 )
-from app.data.empreendedor_repository import EmpreendedorRepository
-from app.utils.jotform_processor import JotformProcessor
-from app.models.impulso_models import Empreendedor
+from data.empreendedor_repository import EmpreendedorRepository
+from utils.jotform_processor import JotformProcessor
+from models.impulso_models import Empreendedor
 
 logger = logging.getLogger(__name__)
 

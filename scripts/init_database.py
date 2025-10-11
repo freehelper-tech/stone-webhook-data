@@ -8,8 +8,8 @@ import os
 # Adicionar diretório pai ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.data.empreendedor_repository import EmpreendedorRepository
-from app.models.impulso_models import Base
+from data.empreendedor_repository import EmpreendedorRepository
+from models.impulso_models import Base
 import logging
 
 logging.basicConfig(

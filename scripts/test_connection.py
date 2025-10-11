@@ -7,7 +7,7 @@ import os
 # Adicionar diretório pai ao path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.core.config import settings
+from core.config import settings
 from sqlalchemy import create_engine, text
 import logging
 

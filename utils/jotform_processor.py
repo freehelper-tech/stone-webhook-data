@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional, Dict, Any, List
 import logging
 
-from app.dto.webhook_dtos import JotformWebhookPayload, EmpreendedorCreateRequest
+from dto.webhook_dtos import JotformWebhookPayload, EmpreendedorCreateRequest
 
 logger = logging.getLogger(__name__)
 

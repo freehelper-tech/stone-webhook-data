@@ -10,8 +10,8 @@ import logging
 import time
 from datetime import datetime
 
-from app.core.config import settings
-from app.api import webhook
+from core.config import settings
+from api import webhook
 
 # Configurar logging
 logging.basicConfig(
@@ -154,7 +154,7 @@ async def health_check():
     """Health check da aplicação"""
     try:
         # Testar conexão com banco
-        from app.data.empreendedor_repository import EmpreendedorRepository
+        from data.empreendedor_repository import EmpreendedorRepository
         repo = EmpreendedorRepository()
         stats = repo.get_stats()
         
@@ -186,7 +186,7 @@ if __name__ == "__main__":
     import uvicorn
     
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,

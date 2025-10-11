@@ -9,12 +9,12 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 import logging
 
-from app.core.config import settings
-from app.models.impulso_models import (
+from core.config import settings
+from models.impulso_models import (
     Base, Empreendedor, Mentor, StatusMentoria, 
     Credito, NPSScore, LudosAtividade
 )
-from app.dto.webhook_dtos import (
+from dto.webhook_dtos import (
     EmpreendedorCreateRequest,
     EmpreendedorUpdateRequest,
     EmpreendedorSearchRequest
