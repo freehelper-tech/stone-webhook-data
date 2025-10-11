@@ -1,0 +1,30 @@
+# ===== DASHBOARD IMPULSO STONE - WEBHOOK API =====
+# Dependências do projeto
+
+# FastAPI e servidor
+fastapi
+uvicorn[standard]
+python-multipart
+
+# Banco de dados SQL Server
+pyodbc
+sqlalchemy
+
+# Validação e configuração
+pydantic
+pydantic-settings
+python-decouple
+
+# Utilitários
+httpx
+python-dateutil
+email-validator
+
+# Segurança
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Testes
+pytest
+pytest-asyncio
+requests
