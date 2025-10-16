@@ -3,8 +3,8 @@ DTOs para Webhook do Jotform
 Data Transfer Objects para receber e processar dados do formulário
 """
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, EmailStr, validator
+from typing import Optional, List, Dict, Any, Union
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 # ===== JOTFORM REQUEST DTOs =====
@@ -59,7 +59,7 @@ class JotformWebhookPayload(BaseModel):
     
     # Renda
     faixa_renda: Optional[str] = Field(None, alias="Faixa de renda familiar mensal")
-    fontes_renda: Optional[List[str]] = Field(None, alias="Quais são as suas fontes de renda atualmente?")
+    fontes_renda: Optional[Union[List[str], str]] = Field(None, alias="Quais são as suas fontes de renda atualmente?")
     fonte_renda: Optional[str] = None
     
     # Negócio
@@ -70,6 +70,25 @@ class JotformWebhookPayload(BaseModel):
     
     # Apelido
     apelido: Optional[str] = None
+    
+    @field_validator('fontes_renda', mode='before')
+    @classmethod
+    def validate_fontes_renda(cls, v):
+        """Validador para aceitar string vazia e convertê-la em None"""
+        if v == "" or v is None:
+            return None
+        if isinstance(v, str):
+            # Se for string não-vazia, retornar como lista
+            return [v] if v.strip() else None
+        return v
+    
+    @field_validator('raca_cor', 'segmento_atuacao', 'segmento_outros', mode='before')
+    @classmethod
+    def validate_empty_string(cls, v):
+        """Validador para converter strings vazias em None"""
+        if v == "" or (isinstance(v, str) and not v.strip()):
+            return None
+        return v
     
     class Config:
         populate_by_name = True  # Pydantic 2.x

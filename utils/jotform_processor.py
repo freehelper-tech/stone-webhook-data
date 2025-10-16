@@ -88,21 +88,25 @@ class JotformProcessor:
     def processar_fontes_renda(payload: JotformWebhookPayload) -> Optional[str]:
         """
         Processar fontes de renda
-        Pode vir como lista ou string
+        Pode vir como lista, string ou None (campo removido do formulário)
         """
         try:
             # Se vier lista do Jotform
             if payload.fontes_renda and isinstance(payload.fontes_renda, list):
-                return '; '.join([str(item).strip() for item in payload.fontes_renda])
+                # Filtrar itens vazios
+                items = [str(item).strip() for item in payload.fontes_renda if item]
+                return '; '.join(items) if items else None
             
-            # Se vier string direta
-            if payload.fonte_renda:
+            # Se vier string direta de fonte_renda
+            if payload.fonte_renda and payload.fonte_renda.strip():
                 return payload.fonte_renda.strip()
             
             # Fallback para fontes_renda como string
             if payload.fontes_renda and isinstance(payload.fontes_renda, str):
-                return payload.fontes_renda.strip()
+                stripped = payload.fontes_renda.strip()
+                return stripped if stripped else None
             
+            # Campo removido do formulário ou vazio
             return None
             
         except Exception as e:
