@@ -33,7 +33,14 @@ class Settings(BaseSettings):
         return v
     
     # SQL Server (Azure) - Connection String direta
-    AZURE_SQL_CONNECTION_STRING: str = "mssql+pyodbc://usr_free_helper:23%403ryR2@dev-free-helper.database.windows.net:1433/dashboardImpulso?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&ConnectionTimeout=30"
+    AZURE_SQL_CONNECTION_STRING: str = (
+        "mssql+pyodbc://usr_free_helper:23%403ryR2"
+        "@dev-free-helper.database.windows.net:1433/dashboardImpulso"
+        "?driver=ODBC+Driver+18+for+SQL+Server"
+        "&Encrypt=yes"
+        "&TrustServerCertificate=no"
+        "&Connection+Timeout=30"
+    )
     
     # SQL Server (Fallback - componentes individuais)
     SQL_SERVER: str = "localhost"
@@ -54,7 +61,10 @@ class Settings(BaseSettings):
         """
         # Se tem AZURE_SQL_CONNECTION_STRING, usar ela diretamente
         if self.AZURE_SQL_CONNECTION_STRING and self.AZURE_SQL_CONNECTION_STRING.strip():
-            return self.AZURE_SQL_CONNECTION_STRING
+            conn = self.AZURE_SQL_CONNECTION_STRING.strip()
+            if "ConnectionTimeout=" in conn and "Connection+Timeout=" not in conn:
+                conn = conn.replace("ConnectionTimeout=", "Connection+Timeout=")
+            return conn
         
         # Senão, construir a partir dos componentes
         return (
