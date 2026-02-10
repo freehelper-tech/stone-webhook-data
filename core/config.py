@@ -47,8 +47,11 @@ class Settings(BaseSettings):
     SQL_DATABASE: str = "dashboardImpulso"
     SQL_USERNAME: str = "sa"
     SQL_PASSWORD: str = ""
-    SQL_DRIVER: str = "ODBC Driver 18 for SQL Server"
+    SQL_DRIVER: str = "ODBC Driver 18 for SQL Server" 
     
+    # Webhook externo (Sheets Stone) - POST ao receber dados do Jotform
+    SHEETS_STONE_WEBHOOK_URL: str = "https://webhook.amcbots.com.br/webhook/sheetsstone"
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

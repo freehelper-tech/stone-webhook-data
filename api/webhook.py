@@ -5,6 +5,7 @@ Endpoints para processar formulários de empreendedores
 from fastapi import APIRouter, HTTPException, status, Request, Depends
 from fastapi.responses import JSONResponse
 from typing import List, Dict, Any
+import asyncio
 import logging
 import time
 import json
@@ -23,6 +24,7 @@ from dto.webhook_dtos import (
 from data.empreendedor_repository import EmpreendedorRepository
 from utils.jotform_processor import JotformProcessor
 from models.impulso_models import Empreendedor
+from services.sheets_webhook_service import forward_to_sheets_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -292,6 +294,9 @@ async def receber_webhook_jotform(request: Request):
                 }
             )
         
+        # Encaminhar para webhook Sheets Stone (fire-and-forget)
+        asyncio.create_task(forward_to_sheets_webhook(raw_payload))
+
         # Sucesso!
         processing_time = (time.time() - start_time) * 1000
         logger.info("="*80)
@@ -394,6 +399,8 @@ async def receber_webhook_jotform_bulk(payloads: List[JotformWebhookPayload]):
                 success, empreendedor, error = repo.create_empreendedor(empreendedor_data)
                 
                 if success:
+                    # Encaminhar para webhook Sheets Stone (fire-and-forget)
+                    await forward_to_sheets_webhook(payload.model_dump())
                     resultados.append(WebhookResponse(
                         success=True,
                         message=f"Registro {idx + 1}: Sucesso",
