@@ -180,7 +180,11 @@ async def receber_webhook_jotform(request: Request):
                     elif "estado" in key.lower():
                         mapped_payload["Estado"] = value
                     
-                    # Idade
+                    # Escolaridade (antes de Idade: "escolaridade" contém "idade")
+                    elif "escolaridade" in key.lower():
+                        mapped_payload["Escolaridade"] = value
+                    
+                    # Idade (só chaves que têm idade e não são escolaridade)
                     elif "idade" in key.lower():
                         mapped_payload["Idade"] = value
                     
@@ -191,10 +195,6 @@ async def receber_webhook_jotform(request: Request):
                     # Raça/cor
                     elif "raca" in key.lower() or "cor" in key.lower():
                         mapped_payload["Raça/cor"] = value
-                    
-                    # Escolaridade
-                    elif "escolaridade" in key.lower():
-                        mapped_payload["Escolaridade"] = value
                     
                     # Renda
                     elif "renda" in key.lower() and "insira" in key.lower():

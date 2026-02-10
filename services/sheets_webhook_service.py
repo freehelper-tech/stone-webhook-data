@@ -37,11 +37,17 @@ async def forward_to_sheets_webhook(payload: Union[Dict[str, Any], List[Dict[str
             if response.is_success:
                 logger.info("Encaminhamento para Sheets Stone webhook OK: %s", url)
                 return True
-            logger.warning(
-                "Sheets Stone webhook retornou %s: %s",
-                response.status_code,
-                response.text[:200] if response.text else "",
-            )
+            # 404 = webhook ainda não registrado/ativo no destino
+            if response.status_code == 404:
+                logger.info(
+                    "Sheets Stone webhook não registrado/ativo (404). Registre e ative o workflow em produção."
+                )
+            else:
+                logger.warning(
+                    "Sheets Stone webhook retornou %s: %s",
+                    response.status_code,
+                    response.text[:200] if response.text else "",
+                )
             return False
     except httpx.TimeoutException as e:
         logger.warning("Timeout ao enviar para Sheets Stone webhook: %s", e)

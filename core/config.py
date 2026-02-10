@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     SQL_DRIVER: str = "ODBC Driver 18 for SQL Server" 
     
     # Webhook externo (Sheets Stone) - POST ao receber dados do Jotform
-    SHEETS_STONE_WEBHOOK_URL: str = "https://webhook.amcbots.com.br/webhook/sheetsstone"
+    SHEETS_STONE_WEBHOOK_URL: str = "https://webhook.amcbots.com.br/webhook/63aa3143-57b4-4581-be6e-5a05383b72fb"
 
     # Logging
     LOG_LEVEL: str = "INFO"
