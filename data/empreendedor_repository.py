@@ -3,7 +3,7 @@ Repositório para Empreendedores
 Camada de acesso a dados para tabela empreendedores
 """
 from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import create_engine, and_, or_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -61,7 +61,30 @@ class EmpreendedorRepository:
         """
         session = self.get_session()
         try:
-            # Verificar se telefone já existe
+            # Verificar duplicidade em 2 minutos (mesmo telefone + mesmo CPF ou email)
+            dois_minutos_atras = datetime.now() - timedelta(minutes=2)
+            
+            # Buscar por telefone nos últimos 2 minutos
+            duplicado_recente = session.query(Empreendedor).filter(
+                and_(
+                    Empreendedor.telefone == data.telefone,
+                    Empreendedor.data_inscricao >= dois_minutos_atras,
+                    or_(
+                        (data.cpf and Empreendedor.cpf == data.cpf),
+                        (data.email and Empreendedor.email == data.email)
+                    )
+                )
+            ).first()
+            
+            if duplicado_recente:
+                logger.warning(
+                    f"Tentativa de cadastro duplicado detectada: "
+                    f"telefone={data.telefone}, CPF={data.cpf}, email={data.email}, "
+                    f"ID existente={duplicado_recente.id}"
+                )
+                return False, None, "Cadastro duplicado detectado nos últimos 2 minutos"
+            
+            # Verificar se telefone já existe (lógica antiga para sufixos)
             telefone_base = data.telefone[:17]  # Limitar para permitir sufixos
             telefone_final = data.telefone
             

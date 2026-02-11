@@ -214,9 +214,11 @@ async def receber_webhook_jotform(request: Request):
                     elif "seoutros" in key.lower().replace("_", "").replace(" ", ""):
                         mapped_payload["Se outros, qual o segmento de atuação do seu négocio?"] = value
                     
-                    # Organização Stone
-                    elif "insirauma58" in key.lower().replace("_", "").replace(" ", ""):
-                        mapped_payload["Você veio de alguma organização da Rede Instituto Stone? Se sim, qual?"] = value
+                    # Organização Stone (q10_voceVeio ou insirauma58)
+                    elif "voceveio" in key.lower().replace("_", "").replace(" ", "") or "insirauma58" in key.lower().replace("_", "").replace(" ", ""):
+                        # Se for lista, pegar primeiro item; se for string, usar direto
+                        org_value = value[0] if isinstance(value, list) and len(value) > 0 else value
+                        mapped_payload["Você veio de alguma organização da Rede Instituto Stone? Se sim, qual?"] = org_value
                 
                 # Adicionar metadados úteis
                 mapped_payload["submissionID"] = raw_payload.get("submissionID")

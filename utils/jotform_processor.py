@@ -85,6 +85,33 @@ class JotformProcessor:
             return None
     
     @staticmethod
+    def padronizar_organizacao(org: Optional[str]) -> Optional[str]:
+        """
+        Padronizar valor de organização Stone
+        
+        Args:
+            org: Valor bruto da organização
+            
+        Returns:
+            Valor padronizado ou None
+        """
+        if not org:
+            return None
+        
+        org_str = str(org).strip()
+        if not org_str:
+            return None
+        
+        # Padronizar respostas negativas
+        org_lower = org_str.lower()
+        if "não" in org_lower or "nao" in org_lower:
+            if "nenhuma" in org_lower or "organização" in org_lower or "organizacao" in org_lower:
+                return "Não, não vim de nenhuma organização"
+        
+        # Retornar valor original se não for resposta negativa padronizada
+        return org_str
+    
+    @staticmethod
     def processar_fontes_renda(payload: JotformWebhookPayload) -> Optional[str]:
         """
         Processar fontes de renda
@@ -216,7 +243,7 @@ class JotformProcessor:
                 tempo_funcionamento=payload.tempo_funcionamento,
                 segmento_atuacao=payload.segmento_atuacao,
                 segmento_outros=payload.segmento_outros,
-                organizacao_stone=payload.organizacao_stone,
+                organizacao_stone=JotformProcessor.padronizar_organizacao(payload.organizacao_stone),
                 formulario_tipo="Webhook Jotform",
                 
                 # Defaults para campos Ludos
