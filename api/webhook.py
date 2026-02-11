@@ -294,8 +294,24 @@ async def receber_webhook_jotform(request: Request):
                 }
             )
         
-        # Encaminhar para webhook Sheets Stone (fire-and-forget)
-        asyncio.create_task(forward_to_sheets_webhook(raw_payload))
+        # Encaminhar para webhook Sheets Stone (fire-and-forget),
+        # incluindo dados do registro criado no banco
+        sheets_payload = {
+            **raw_payload,
+            # Dados do banco de dados
+            "empreendedor_id": empreendedor.id,
+            "comunidade_originadora": empreendedor.comunidade_originadora,
+            "data_inscricao": empreendedor.data_inscricao.isoformat() if empreendedor.data_inscricao else None,
+            "organizacao_stone": empreendedor.organizacao_stone,
+            "formulario_tipo": empreendedor.formulario_tipo,
+            # Campos adicionais do formulário que podem estar no empreendedor
+            "faixa_renda": empreendedor.faixa_renda,
+            "fonte_renda": empreendedor.fonte_renda,
+            "raca_cor": empreendedor.raca_cor,
+            "segmento_outros": empreendedor.segmento_outros,
+        }
+        logger.info(f"📤 Enviando para Sheets Stone webhook: empreendedor_id={empreendedor.id}")
+        asyncio.create_task(forward_to_sheets_webhook(sheets_payload))
 
         # Sucesso!
         processing_time = (time.time() - start_time) * 1000
@@ -399,8 +415,22 @@ async def receber_webhook_jotform_bulk(payloads: List[JotformWebhookPayload]):
                 success, empreendedor, error = repo.create_empreendedor(empreendedor_data)
                 
                 if success:
-                    # Encaminhar para webhook Sheets Stone (fire-and-forget)
-                    await forward_to_sheets_webhook(payload.model_dump())
+                    # Encaminhar para webhook Sheets Stone, incluindo dados do registro criado
+                    bulk_sheets_payload = {
+                        **payload.model_dump(by_alias=True, exclude_none=True),
+                        # Dados do banco de dados
+                        "empreendedor_id": empreendedor.id,
+                        "comunidade_originadora": empreendedor.comunidade_originadora,
+                        "data_inscricao": empreendedor.data_inscricao.isoformat() if empreendedor.data_inscricao else None,
+                        "organizacao_stone": empreendedor.organizacao_stone,
+                        "formulario_tipo": empreendedor.formulario_tipo,
+                        # Campos adicionais do formulário que podem estar no empreendedor
+                        "faixa_renda": empreendedor.faixa_renda,
+                        "fonte_renda": empreendedor.fonte_renda,
+                        "raca_cor": empreendedor.raca_cor,
+                        "segmento_outros": empreendedor.segmento_outros,
+                    }
+                    await forward_to_sheets_webhook(bulk_sheets_payload)
                     resultados.append(WebhookResponse(
                         success=True,
                         message=f"Registro {idx + 1}: Sucesso",
