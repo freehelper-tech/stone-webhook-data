@@ -196,8 +196,8 @@ async def receber_webhook_jotform(request: Request):
                     elif "raca" in key.lower() or "cor" in key.lower():
                         mapped_payload["Raça/cor"] = value
                     
-                    # Renda
-                    elif "renda" in key.lower() and "insira" in key.lower():
+                    # Renda (q20_faixaDe ou campos com "renda" e "insira")
+                    elif "faixade" in key.lower().replace("_", "").replace(" ", "") or ("renda" in key.lower() and "insira" in key.lower()):
                         mapped_payload["Faixa de renda familiar mensal"] = value
                     
                     # Fontes de renda
@@ -223,6 +223,20 @@ async def receber_webhook_jotform(request: Request):
                 # Adicionar metadados úteis
                 mapped_payload["submissionID"] = raw_payload.get("submissionID")
                 mapped_payload["formID"] = raw_payload.get("formID")
+                
+                # Log de campos não mapeados (para debug)
+                campos_nao_mapeados = [
+                    key for key in raw_request_data.keys() 
+                    if not any(
+                        key.lower() in mapped_key.lower() or mapped_key.lower() in key.lower()
+                        for mapped_key in mapped_payload.keys()
+                    )
+                    and key not in ["slug", "uploadServerUrl", "jsExecutionTracker", "submitSource", 
+                                   "submitDate", "buildDate", "event_id", "timeToSubmit", 
+                                   "enterprise_server", "validatedNewRequiredFieldIDs", "path", "newCardFormMobile"]
+                ]
+                if campos_nao_mapeados:
+                    logger.debug(f"⚠️ Campos do rawRequest não mapeados: {campos_nao_mapeados}")
                 
                 raw_payload = mapped_payload
                 logger.info("✅ Campos mapeados com sucesso")
