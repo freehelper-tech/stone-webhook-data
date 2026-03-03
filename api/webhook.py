@@ -220,9 +220,11 @@ async def receber_webhook_jotform(request: Request):
                         org_value = value[0] if isinstance(value, list) and len(value) > 0 else value
                         mapped_payload["Você veio de alguma organização da Rede Instituto Stone? Se sim, qual?"] = org_value
                 
-                # Adicionar metadados úteis
+                # Adicionar metadados úteis (submitDate para data de inscrição)
                 mapped_payload["submissionID"] = raw_payload.get("submissionID")
                 mapped_payload["formID"] = raw_payload.get("formID")
+                if raw_request_data.get("submitDate"):
+                    mapped_payload["submitDate"] = raw_request_data.get("submitDate")
                 
                 # Log de campos não mapeados (para debug)
                 campos_nao_mapeados = [

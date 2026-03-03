@@ -1,12 +1,42 @@
 """
 Processador de dados do Jotform
-Funções auxiliares para converter payload do Jotform em dados estruturados
+Validação, normalização e conversão para EmpreendedorCreateRequest.
+Ref.: Tratamento de dados antes de inserir no banco (webhook).
 """
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 import logging
 
 from dto.webhook_dtos import JotformWebhookPayload, EmpreendedorCreateRequest
+from services.data_service import (
+    safe_value,
+    clean_nome,
+    padronizar_organizacao as padronizar_organizacao_ds,
+    safe_cpf,
+    validar_email,
+    parse_datetime,
+    to_bool,
+    safe_telefone,
+    _safe_str,
+    MAX_NOME,
+    MAX_TELEFONE,
+    MAX_EMAIL,
+    MAX_CPF,
+    MAX_CIDADE,
+    MAX_ESTADO,
+    MAX_IDADE,
+    MAX_GENERO,
+    MAX_RACA_COR,
+    MAX_ESCOLARIDADE,
+    MAX_FAIXA_RENDA,
+    MAX_TEMPO_FUNCIONAMENTO,
+    MAX_SEGMENTO_ATUACAO,
+    MAX_SEGMENTO_OUTROS,
+    MAX_ORGANIZACAO_STONE,
+    MAX_FORMULARIO_TIPO,
+    MAX_APELIDO,
+    MAX_FONTE_RENDA,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -17,29 +47,22 @@ class JotformProcessor:
     @staticmethod
     def processar_nome(payload: JotformWebhookPayload) -> Optional[str]:
         """
-        Processar campo Nome do Jotform
-        
-        O nome pode vir como:
-        - Objeto com first/last
-        - String direta
+        Processar campo Nome: objeto first/last ou string, depois clean_nome e truncar.
         """
         try:
-            # Tentar objeto first/last
-            if payload.Nome and hasattr(payload.Nome, 'first'):
-                first = payload.Nome.first.strip()
-                last = payload.Nome.last.strip()
-                return f"{first} {last}".strip()
-            
-            # Tentar campo nome direto
-            if payload.nome:
-                return payload.nome.strip()
-            
-            # Fallback para campos alternativos
-            if payload.Nome and isinstance(payload.Nome, str):
-                return payload.Nome.strip()
-            
-            return None
-            
+            raw = None
+            if payload.Nome and hasattr(payload.Nome, "first"):
+                first = (payload.Nome.first or "").strip()
+                last = (payload.Nome.last or "").strip()
+                raw = f"{first} {last}".strip()
+            elif payload.nome:
+                raw = payload.nome.strip()
+            elif payload.Nome and isinstance(payload.Nome, str):
+                raw = payload.Nome.strip()
+            if not raw:
+                return None
+            nome_limpo = clean_nome(raw)
+            return _safe_str(nome_limpo or raw, MAX_NOME) if (nome_limpo or raw) else None
         except Exception as e:
             logger.error(f"Erro ao processar nome: {e}")
             return None
@@ -47,230 +70,123 @@ class JotformProcessor:
     @staticmethod
     def processar_telefone(payload: JotformWebhookPayload) -> Optional[str]:
         """
-        Processar campo Telefone do Jotform
-        
-        O telefone pode vir como:
-        - Objeto com area/phone
-        - String direta
+        Processar campo Telefone: objeto area/phone ou string; trim e máx 20 caracteres.
         """
         try:
-            # Tentar objeto area/phone
-            if payload.Telefone and hasattr(payload.Telefone, 'area'):
-                area = payload.Telefone.area.strip()
-                phone = payload.Telefone.phone.strip()
-                return f"({area}) {phone}"
-            
-            # Tentar campo telefone direto
-            if payload.telefone:
-                return payload.telefone.strip()
-            
-            # Fallback para campos alternativos
-            if payload.Telefone and isinstance(payload.Telefone, str):
-                return payload.Telefone.strip()
-            
-            return None
-            
+            raw = None
+            if payload.Telefone and hasattr(payload.Telefone, "area"):
+                area = (getattr(payload.Telefone, "area", "") or "").strip()
+                phone = (getattr(payload.Telefone, "phone", "") or "").strip()
+                raw = f"({area}) {phone}".strip() if (area or phone) else None
+            if raw is None and payload.telefone:
+                raw = payload.telefone.strip()
+            if raw is None and payload.Telefone and isinstance(payload.Telefone, str):
+                raw = payload.Telefone.strip()
+            return safe_telefone(raw) if raw else None
         except Exception as e:
             logger.error(f"Erro ao processar telefone: {e}")
             return None
     
     @staticmethod
     def processar_email(payload: JotformWebhookPayload) -> Optional[str]:
-        """Processar campo Email"""
+        """Email: trim, minúsculas, válido (contém @). Se informado sem @, ignora (None) e registra log."""
         try:
-            email = payload.email or payload.Email
-            return email.strip().lower() if email else None
+            email = safe_value(getattr(payload, "email", None) or getattr(payload, "Email", None))
+            if not email:
+                return None
+            email = email.strip().lower()
+            if "@" not in email:
+                logger.info("Campo email descartado (sem @): valor não será gravado no banco")
+                return None
+            return _safe_str(email, MAX_EMAIL)
         except Exception as e:
             logger.error(f"Erro ao processar email: {e}")
             return None
     
     @staticmethod
-    def padronizar_organizacao(org: Optional[str]) -> Optional[str]:
-        """
-        Padronizar valor de organização Stone
-        
-        Args:
-            org: Valor bruto da organização
-            
-        Returns:
-            Valor padronizado ou None
-        """
-        if not org:
-            return None
-        
-        org_str = str(org).strip()
-        if not org_str:
-            return None
-        
-        # Padronizar respostas negativas
-        org_lower = org_str.lower()
-        if "não" in org_lower or "nao" in org_lower:
-            if "nenhuma" in org_lower or "organização" in org_lower or "organizacao" in org_lower:
-                return "Não, não vim de nenhuma organização"
-        
-        # Retornar valor original se não for resposta negativa padronizada
-        return org_str
-    
-    @staticmethod
     def processar_fontes_renda(payload: JotformWebhookPayload) -> Optional[str]:
-        """
-        Processar fontes de renda
-        Pode vir como lista, string ou None (campo removido do formulário)
-        """
+        """Fontes de renda: lista juntada com '; ' ou string; truncar ao limite da coluna."""
         try:
-            # Se vier lista do Jotform
-            if payload.fontes_renda and isinstance(payload.fontes_renda, list):
-                # Filtrar itens vazios
+            raw = None
+            if getattr(payload, "fontes_renda", None) and isinstance(payload.fontes_renda, list):
                 items = [str(item).strip() for item in payload.fontes_renda if item]
-                return '; '.join(items) if items else None
-            
-            # Se vier string direta de fonte_renda
-            if payload.fonte_renda and payload.fonte_renda.strip():
-                return payload.fonte_renda.strip()
-            
-            # Fallback para fontes_renda como string
-            if payload.fontes_renda and isinstance(payload.fontes_renda, str):
-                stripped = payload.fontes_renda.strip()
-                return stripped if stripped else None
-            
-            # Campo removido do formulário ou vazio
-            return None
-            
+                raw = "; ".join(items) if items else None
+            elif getattr(payload, "fonte_renda", None) and payload.fonte_renda.strip():
+                raw = payload.fonte_renda.strip()
+            elif getattr(payload, "fontes_renda", None) and isinstance(payload.fontes_renda, str):
+                raw = payload.fontes_renda.strip() or None
+            return _safe_str(raw, MAX_FONTE_RENDA) if raw else None
         except Exception as e:
             logger.error(f"Erro ao processar fontes de renda: {e}")
             return None
     
     @staticmethod
-    def limpar_cpf(cpf: Optional[str]) -> Optional[str]:
-        """Limpar CPF removendo caracteres especiais"""
-        if not cpf:
-            return None
-        
-        try:
-            # Remover pontos, hífens e espaços
-            cpf_limpo = ''.join(filter(str.isdigit, str(cpf)))
-            return cpf_limpo[:14] if cpf_limpo else None
-        except Exception as e:
-            logger.error(f"Erro ao limpar CPF: {e}")
-            return None
-    
-    @staticmethod
-    def processar_data_inscricao(data_str: Optional[str] = None) -> datetime:
-        """
-        Processar data de inscrição
-        Se não fornecida, usar data/hora atual
-        """
-        if not data_str:
-            return datetime.now()
-        
-        try:
-            # Tentar formatos comuns
-            formatos = [
-                '%Y-%m-%d %H:%M:%S',
-                '%Y-%m-%d',
-                '%d/%m/%Y',
-                '%d/%m/%Y %H:%M:%S',
-                '%b. %d, %Y',  # Formato Jotform: "Oct. 10, 2025"
-            ]
-            
-            for formato in formatos:
-                try:
-                    return datetime.strptime(data_str, formato)
-                except ValueError:
-                    continue
-            
-            # Se nenhum formato funcionou, usar data atual
-            logger.warning(f"Não foi possível parsear data: {data_str}. Usando data atual.")
-            return datetime.now()
-            
-        except Exception as e:
-            logger.error(f"Erro ao processar data: {e}")
-            return datetime.now()
-    
-    @staticmethod
     def payload_to_empreendedor(payload: JotformWebhookPayload) -> EmpreendedorCreateRequest:
         """
-        Converter payload do Jotform em EmpreendedorCreateRequest
-        
-        Args:
-            payload: Payload recebido do webhook Jotform
-            
-        Returns:
-            EmpreendedorCreateRequest: Dados estruturados do empreendedor
+        Converter payload do Jotform em EmpreendedorCreateRequest.
+        Aplica validação, normalização e truncamento conforme documento de tratamento de dados.
+
+        Campos que são levados ao banco (não deixamos de levar se vierem no payload):
+        nome, telefone, email, cpf, apelido, cidade, estado, idade, genero, raca_cor,
+        escolaridade, faixa_renda, fonte_renda, tempo_funcionamento, segmento_atuacao,
+        segmento_outros, organizacao_stone, data_inscricao (submitDate), formulario_tipo.
         """
         try:
-            # Processar nome (obrigatório)
             nome = JotformProcessor.processar_nome(payload)
             if not nome:
-                raise ValueError("Nome é obrigatório")
-            
-            # Processar telefone (obrigatório)
+                raise ValueError("Nome é obrigatório (não pode ser vazio após trim/clean)")
             telefone = JotformProcessor.processar_telefone(payload)
             if not telefone:
                 raise ValueError("Telefone é obrigatório")
-            
-            # Processar email
             email = JotformProcessor.processar_email(payload)
-            
-            # Processar CPF
-            cpf = JotformProcessor.limpar_cpf(payload.CPF or payload.cpf)
-            
-            # Processar fontes de renda
+            cpf_raw = getattr(payload, "CPF", None) or getattr(payload, "cpf", None)
+            cpf = safe_cpf(cpf_raw)
+            if cpf_raw and safe_value(cpf_raw) and not cpf:
+                logger.info("Campo CPF descartado (inválido ou sequência de teste): valor não será gravado no banco")
             fonte_renda = JotformProcessor.processar_fontes_renda(payload)
-            
-            # Criar request
+            data_str = getattr(payload, "submitDate", None) or getattr(payload, "submissionDate", None) or getattr(payload, "Submission Date", None)
+            data_inscricao = parse_datetime(data_str, default_now=True)
+            org_raw = getattr(payload, "organizacao_stone", None)
+            organizacao_stone = padronizar_organizacao_ds(org_raw)
             return EmpreendedorCreateRequest(
-                # Obrigatórios
                 nome=nome,
                 telefone=telefone,
-                
-                # Principais
                 email=email,
-                comunidade_originadora="Impulso Stone",  # Padrão
-                data_inscricao=datetime.now(),
-                
-                # Formulário Jotform
-                apelido=payload.apelido,
+                comunidade_originadora=_safe_str("Impulso Stone", 50),
+                data_inscricao=data_inscricao,
+                apelido=_safe_str(getattr(payload, "apelido", None), MAX_APELIDO),
                 cpf=cpf,
-                cidade=payload.Cidade or payload.cidade,
-                estado=payload.Estado or payload.estado,
-                idade=payload.Idade or payload.idade,
-                genero=payload.Genero or payload.genero,
-                raca_cor=payload.raca_cor,
-                escolaridade=payload.Escolaridade or payload.escolaridade,
-                faixa_renda=payload.faixa_renda,
+                cidade=_safe_str(getattr(payload, "Cidade", None) or getattr(payload, "cidade", None), MAX_CIDADE),
+                estado=_safe_str(getattr(payload, "Estado", None) or getattr(payload, "estado", None), MAX_ESTADO),
+                idade=_safe_str(getattr(payload, "Idade", None) or getattr(payload, "idade", None), MAX_IDADE),
+                genero=_safe_str(getattr(payload, "Genero", None) or getattr(payload, "genero", None), MAX_GENERO),
+                raca_cor=_safe_str(getattr(payload, "raca_cor", None), MAX_RACA_COR),
+                escolaridade=_safe_str(getattr(payload, "Escolaridade", None) or getattr(payload, "escolaridade", None), MAX_ESCOLARIDADE),
+                faixa_renda=_safe_str(getattr(payload, "faixa_renda", None), MAX_FAIXA_RENDA),
                 fonte_renda=fonte_renda,
-                tempo_funcionamento=payload.tempo_funcionamento,
-                segmento_atuacao=payload.segmento_atuacao,
-                segmento_outros=payload.segmento_outros,
-                organizacao_stone=JotformProcessor.padronizar_organizacao(payload.organizacao_stone),
-                formulario_tipo="Webhook Jotform",
-                
-                # Defaults para campos Ludos
+                tempo_funcionamento=_safe_str(getattr(payload, "tempo_funcionamento", None), MAX_TEMPO_FUNCIONAMENTO),
+                segmento_atuacao=_safe_str(getattr(payload, "segmento_atuacao", None), MAX_SEGMENTO_ATUACAO),
+                segmento_outros=_safe_str(getattr(payload, "segmento_outros", None), MAX_SEGMENTO_OUTROS),
+                organizacao_stone=organizacao_stone,
+                formulario_tipo=_safe_str("Webhook Jotform", MAX_FORMULARIO_TIPO) or "Webhook Jotform",
                 ludos_pontos=0,
                 ludos_moedas=0,
                 ludos_nivel=1,
-                
-                # Defaults para campos MGM
                 mgm_total_mensagens=0,
                 mgm_total_reacoes=0,
                 mgm_total_interacoes=0,
                 mgm_engajamento_percent=0.0,
-                
-                # Defaults para flags
                 esta_na_comunidade=False,
                 esta_no_grupo_mentoria=False,
                 esta_no_papo_impulso=False,
                 interacao_nos_grupos=0,
-                ativo_na_ludos=False,
+                ativo_na_ludos=to_bool(getattr(payload, "ativo_na_ludos", None)),
                 fazendo_mentoria=False,
                 solicitou_credito=False,
             )
-            
         except ValueError as e:
             logger.error(f"Erro de validação ao processar payload: {e}")
             raise
-        
         except Exception as e:
             logger.error(f"Erro ao converter payload: {e}")
             raise

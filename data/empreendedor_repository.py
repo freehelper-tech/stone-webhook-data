@@ -3,7 +3,7 @@ Repositório para Empreendedores
 Camada de acesso a dados para tabela empreendedores
 """
 from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy import create_engine, and_, or_, func, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
@@ -11,7 +11,7 @@ import logging
 
 from core.config import settings
 from models.impulso_models import (
-    Base, Empreendedor, Mentor, StatusMentoria, 
+    Base, Empreendedor, Mentor, StatusMentoria,
     Credito, NPSScore, LudosAtividade
 )
 from dto.webhook_dtos import (
@@ -19,6 +19,7 @@ from dto.webhook_dtos import (
     EmpreendedorUpdateRequest,
     EmpreendedorSearchRequest
 )
+from services.data_service import normalizar_telefone_digitos
 
 logger = logging.getLogger(__name__)
 
@@ -54,55 +55,93 @@ class EmpreendedorRepository:
     
     def create_empreendedor(self, data: EmpreendedorCreateRequest) -> Tuple[bool, Optional[Empreendedor], Optional[str]]:
         """
-        Criar novo empreendedor
-        
+        Criar ou atualizar empreendedor (webhook).
+        Deduplicação: buscar por CPF → email → telefone; se existir, atualizar; senão, inserir.
         Returns:
             Tuple[bool, Optional[Empreendedor], Optional[str]]: (sucesso, empreendedor, erro)
         """
         session = self.get_session()
         try:
-            # Verificar duplicidade em 2 minutos (mesmo telefone + mesmo CPF ou email)
-            dois_minutos_atras = datetime.now() - timedelta(minutes=2)
-            
-            # Buscar por telefone nos últimos 2 minutos
-            duplicado_recente = session.query(Empreendedor).filter(
-                and_(
-                    Empreendedor.telefone == data.telefone,
-                    Empreendedor.data_inscricao >= dois_minutos_atras,
-                    or_(
-                        (data.cpf and Empreendedor.cpf == data.cpf),
-                        (data.email and Empreendedor.email == data.email)
-                    )
-                )
-            ).first()
-            
-            if duplicado_recente:
-                logger.warning(
-                    f"Tentativa de cadastro duplicado detectada: "
-                    f"telefone={data.telefone}, CPF={data.cpf}, email={data.email}, "
-                    f"ID existente={duplicado_recente.id}"
-                )
-                return False, None, "Cadastro duplicado detectado nos últimos 2 minutos"
-            
-            # Verificar se telefone já existe (lógica antiga para sufixos)
-            telefone_base = data.telefone[:17]  # Limitar para permitir sufixos
-            telefone_final = data.telefone
-            
-            # Se telefone existe, adicionar sufixo
-            contador = 1
-            while session.query(Empreendedor).filter(
-                Empreendedor.telefone == telefone_final
-            ).first():
-                telefone_final = f"{telefone_base}_{contador}"
-                contador += 1
-                if len(telefone_final) > 20:  # Limite do campo
-                    return False, None, "Não foi possível gerar telefone único"
-            
-            # Criar empreendedor
+            # Deduplicação: ordem CPF → email → telefone (documento de tratamento de dados)
+            existente = None
+            if data.cpf:
+                existente = session.query(Empreendedor).filter(
+                    Empreendedor.cpf == data.cpf
+                ).first()
+            if not existente and data.email:
+                email_norm = (data.email or "").strip().lower()
+                if email_norm:
+                    existente = session.query(Empreendedor).filter(
+                        func.lower(Empreendedor.email) == email_norm
+                    ).first()
+            if not existente and data.telefone:
+                tel_digitos = normalizar_telefone_digitos(data.telefone)
+                if tel_digitos:
+                    for emp in session.query(Empreendedor).filter(
+                        Empreendedor.telefone.isnot(None)
+                    ).all():
+                        if normalizar_telefone_digitos(emp.telefone) == tel_digitos:
+                            existente = emp
+                            break
+            if existente:
+                # Atualizar registro existente: obrigatórios sempre; opcionais só se vier valor (não sobrescrever com vazio)
+                existente.nome = self.safe_str(data.nome, 100)
+                existente.telefone = (data.telefone or "")[:20]
+                _opt = self.safe_str(data.email, 100)
+                if _opt is not None:
+                    existente.email = _opt
+                _opt = self.safe_str(data.apelido, 100)
+                if _opt is not None:
+                    existente.apelido = _opt
+                _opt = self.safe_str(data.cpf, 14)
+                if _opt is not None:
+                    existente.cpf = _opt
+                _opt = self.safe_str(data.cidade, 100)
+                if _opt is not None:
+                    existente.cidade = _opt
+                _opt = self.safe_str(data.estado, 50)
+                if _opt is not None:
+                    existente.estado = _opt
+                _opt = self.safe_str(data.idade, 20)
+                if _opt is not None:
+                    existente.idade = _opt
+                _opt = self.safe_str(data.genero, 50)
+                if _opt is not None:
+                    existente.genero = _opt
+                _opt = self.safe_str(data.raca_cor, 50)
+                if _opt is not None:
+                    existente.raca_cor = _opt
+                _opt = self.safe_str(data.escolaridade, 100)
+                if _opt is not None:
+                    existente.escolaridade = _opt
+                _opt = self.safe_str(data.faixa_renda, 100)
+                if _opt is not None:
+                    existente.faixa_renda = _opt
+                if data.fonte_renda is not None and (data.fonte_renda or "").strip():
+                    existente.fonte_renda = data.fonte_renda
+                _opt = self.safe_str(data.tempo_funcionamento, 50)
+                if _opt is not None:
+                    existente.tempo_funcionamento = _opt
+                _opt = self.safe_str(data.segmento_atuacao, 100)
+                if _opt is not None:
+                    existente.segmento_atuacao = _opt
+                _opt = self.safe_str(data.segmento_outros, 100)
+                if _opt is not None:
+                    existente.segmento_outros = _opt
+                _opt = self.safe_str(data.organizacao_stone, 100)
+                if _opt is not None:
+                    existente.organizacao_stone = _opt
+                existente.formulario_tipo = self.safe_str(data.formulario_tipo, 50) or "Webhook Jotform"
+                if data.data_inscricao and not existente.data_inscricao:
+                    existente.data_inscricao = data.data_inscricao
+                session.commit()
+                session.refresh(existente)
+                logger.info(f"Empreendedor atualizado (webhook): ID={existente.id}, Nome={existente.nome}")
+                return True, existente, None
+            # Inserir novo
             empreendedor = Empreendedor(
-                # Campos obrigatórios
                 nome=self.safe_str(data.nome, 100),
-                telefone=telefone_final[:20],
+                telefone=(data.telefone or "")[:20],
                 
                 # Campos principais
                 email=self.safe_str(data.email, 100),
@@ -217,7 +256,9 @@ class EmpreendedorRepository:
             session.close()
     
     def get_empreendedor_by_cpf(self, cpf: str) -> Optional[Empreendedor]:
-        """Buscar empreendedor por CPF"""
+        """Buscar empreendedor por CPF (valor já normalizado, 11 dígitos)."""
+        if not cpf:
+            return None
         session = self.get_session()
         try:
             return session.query(Empreendedor).filter(
@@ -225,6 +266,7 @@ class EmpreendedorRepository:
             ).first()
         finally:
             session.close()
+
     
     def search_empreendedores(
         self, 
