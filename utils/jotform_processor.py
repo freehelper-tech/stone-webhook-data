@@ -41,6 +41,25 @@ from services.data_service import (
 logger = logging.getLogger(__name__)
 
 
+def _segmento_outros_com_segundo_negocio(payload: JotformWebhookPayload) -> Optional[str]:
+    """
+    Monta segmento_outros: texto "Se outros qual" do primeiro negócio e, quando
+    "Você tem outro negócio?" = Sim, acrescenta "Segundo negócio: [segmento], [tempo]".
+    """
+    extra = getattr(payload, "model_extra", None) or {}
+    primeiro = safe_value(getattr(payload, "segmento_outros", None))
+    tem_outro = safe_value(extra.get("Você tem outro negócio que gostaria de cadastrar?"))
+    seg2 = safe_value(extra.get("Segmento de atuação (segundo negócio)"))
+    tempo2 = safe_value(extra.get("Tempo de funcionamento do segundo negócio"))
+    partes = []
+    if primeiro:
+        partes.append(primeiro)
+    if tem_outro and str(tem_outro).lower() in ("sim", "s", "yes") and (seg2 or tempo2):
+        segundo = "Segundo negócio: " + ", ".join(x for x in (seg2, tempo2) if x)
+        partes.append(segundo)
+    return ", ".join(partes) if partes else None
+
+
 class JotformProcessor:
     """Classe para processar dados do Jotform"""
     
@@ -148,11 +167,16 @@ class JotformProcessor:
             data_inscricao = parse_datetime(data_str, default_now=True)
             org_raw = getattr(payload, "organizacao_stone", None)
             organizacao_stone = padronizar_organizacao_ds(org_raw)
+            # Comunidade originadora: quando escolhe uma organização (ex.: Empreende Aí, Recomeçar), grava nessa coluna; senão "Impulso Stone"
+            if organizacao_stone and organizacao_stone != "Nao vim de nenhuma organizacao":
+                comunidade_originadora = _safe_str(organizacao_stone, 50)
+            else:
+                comunidade_originadora = _safe_str("Impulso Stone", 50)
             return EmpreendedorCreateRequest(
                 nome=nome,
                 telefone=telefone,
                 email=email,
-                comunidade_originadora=_safe_str("Impulso Stone", 50),
+                comunidade_originadora=comunidade_originadora,
                 data_inscricao=data_inscricao,
                 apelido=_safe_str(getattr(payload, "apelido", None), MAX_APELIDO),
                 cpf=cpf,
@@ -166,7 +190,10 @@ class JotformProcessor:
                 fonte_renda=fonte_renda,
                 tempo_funcionamento=_safe_str(getattr(payload, "tempo_funcionamento", None), MAX_TEMPO_FUNCIONAMENTO),
                 segmento_atuacao=_safe_str(getattr(payload, "segmento_atuacao", None), MAX_SEGMENTO_ATUACAO),
-                segmento_outros=_safe_str(getattr(payload, "segmento_outros", None), MAX_SEGMENTO_OUTROS),
+                segmento_outros=_safe_str(
+                    _segmento_outros_com_segundo_negocio(payload),
+                    MAX_SEGMENTO_OUTROS,
+                ),
                 organizacao_stone=organizacao_stone,
                 formulario_tipo=_safe_str("Webhook Jotform", MAX_FORMULARIO_TIPO) or "Webhook Jotform",
                 ludos_pontos=0,

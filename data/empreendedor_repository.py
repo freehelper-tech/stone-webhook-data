@@ -131,6 +131,9 @@ class EmpreendedorRepository:
                 _opt = self.safe_str(data.organizacao_stone, 100)
                 if _opt is not None:
                     existente.organizacao_stone = _opt
+                _opt = self.safe_str(data.comunidade_originadora, 50)
+                if _opt is not None:
+                    existente.comunidade_originadora = _opt
                 existente.formulario_tipo = self.safe_str(data.formulario_tipo, 50) or "Webhook Jotform"
                 if data.data_inscricao and not existente.data_inscricao:
                     existente.data_inscricao = data.data_inscricao

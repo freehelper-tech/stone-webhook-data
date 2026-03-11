@@ -204,15 +204,30 @@ async def receber_webhook_jotform(request: Request):
                     elif "quaissao" in key.lower().replace("_", "").replace(" ", ""):
                         mapped_payload["Quais são as suas fontes de renda atualmente?"] = value
                     
-                    # Tempo de funcionamento
+                    # Tempo de funcionamento (primeiro negócio = q18_tempoDe; segundo = q88_tempoDe88)
                     elif "tempode" in key.lower().replace("_", "").replace(" ", ""):
-                        mapped_payload["Tempo de funcionamento do negócio"] = value
+                        key_low = key.lower()
+                        if "88" in key_low or "tempode88" in key_low:
+                            mapped_payload["Tempo de funcionamento do segundo negócio"] = value
+                        else:
+                            mapped_payload["Tempo de funcionamento do negócio"] = value
                     
-                    # Segmento
+                    # Segmento (primeiro = q81_segmentoDe; segundo negócio = q86_segmentoDe86)
                     elif "segmentode" in key.lower().replace("_", "").replace(" ", ""):
-                        mapped_payload["Segmento de atuação"] = value
+                        key_low = key.lower()
+                        if "86" in key_low or "segmentode86" in key_low:
+                            mapped_payload["Segmento de atuação (segundo negócio)"] = value
+                        else:
+                            mapped_payload["Segmento de atuação"] = value
                     elif "seoutros" in key.lower().replace("_", "").replace(" ", ""):
                         mapped_payload["Se outros, qual o segmento de atuação do seu négocio?"] = value
+                    
+                    # Você tem outro negócio? (q85_voceTem) → para montar segmento_outros com segundo negócio
+                    elif "voceTem" in key.lower().replace("_", "").replace(" ", ""):
+                        mapped_payload["Você tem outro negócio que gostaria de cadastrar?"] = value
+                    elif "especifiqueAbaixo" in key.lower().replace("_", "").replace(" ", ""):
+                        if value and str(value).strip():
+                            mapped_payload["Especifique (segundo negócio)"] = value
                     
                     # Organização Stone (q10_voceVeio ou insirauma58)
                     elif "voceveio" in key.lower().replace("_", "").replace(" ", "") or "insirauma58" in key.lower().replace("_", "").replace(" ", ""):
